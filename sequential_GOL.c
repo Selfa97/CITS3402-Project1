@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <omp.h>
 
-#define ARRAYSIZE 512
+#define ARRAYSIZE 128
 
 int readFile(int ***state)
 {
@@ -41,7 +41,7 @@ int readFile(int ***state)
 //FREE ALLOCATED GAME STATE MEMORY
 void freeMem(int **state)
 {
-    for(int i = 0; i < ARRAYSIZE; i++)
+    for(int i = 0; i < 2 * ARRAYSIZE; i++)
     {
         free(state[i]);
     }
@@ -53,10 +53,10 @@ int getNeighbours(int **state, int r, int c)
 {
     int live = 0;
     //WRAP AROUND OF CELLS
-    int north = (r-1 < 0) ? 127 : r-1;
-    int south = (r+1)%128;
-    int west = (c-1 < 0) ? 127 : c-1;
-    int east = (c+1)%128;
+    int north = (r-1 < 0) ? ARRAYSIZE-1 : r-1;
+    int south = (r+1)%ARRAYSIZE;
+    int west = (c-1 < 0) ? ARRAYSIZE-1 : c-1;
+    int east = (c+1)%ARRAYSIZE;
 
     //CHECK NEIGHBOURS
     live += state[north][c];
@@ -97,18 +97,11 @@ int main()
 {
     double begin = omp_get_wtime();
 
-    //ALLOCATE MEMORY FOR GAME STATE
-    int **state = (int **)malloc(ARRAYSIZE * sizeof(int *));
-    for (int i = 0; i < ARRAYSIZE; i++)
+    //ALLOCATE MEMORY FOR GAME STATE & TEMP GAME STATE -> OFFSET INDEX
+    int **state = (int **)malloc(2 * ARRAYSIZE * sizeof(int *));
+    for (int i = 0; i < 2 * ARRAYSIZE; i++)
     {
         state[i] = (int *)malloc(ARRAYSIZE * sizeof(int));
-    }
-
-    //ALLOCATE MEMORY FOR TEMP GAME STATE
-    int **tmp = (int **)malloc(ARRAYSIZE * sizeof(int *));
-    for (int i = 0; i < ARRAYSIZE; i++)
-    {
-        tmp[i] = (int *)malloc(ARRAYSIZE * sizeof(int));
     }
 
     //READ STATIC GAME STATE FROM FILE
@@ -134,27 +127,35 @@ int main()
                     //WITH TOO FEW OR TOO MANY NEIGHBOURS -> DEAD
                     if(neighbours < 2 || neighbours == 4)
                     {
-                        tmp[i][j] = 0;
+                        state[ARRAYSIZE + i][j] = 0;
                     }
                     //OTHERWISE ALIVE
                     else
                     {
-                        tmp[i][j] = 1;
+                        state[ARRAYSIZE + i][j] = 1;
                     }
                 }
                 //IF DEAD WITH 3 NEIGHBOURS -> ALIVE
                 else if(neighbours == 3)
                 {
-                    tmp[i][j] = 1;
+                    state[ARRAYSIZE + i][j] = 1;
                 }
                 //OTHERWISE DEAD
                 else
                 {
-                    tmp[i][j] = 0;
+                    state[ARRAYSIZE + i][j] = 0;
                 }
             }
         }
-        state = tmp;
+        
+        //TRANSFER TEMP STATE TO CURR STATE
+        for(int i = 0; i < ARRAYSIZE; i++)
+        {
+            for(int j = 0; j < ARRAYSIZE; j++)
+            {
+                state[i][j] = state[ARRAYSIZE + i][j];
+            }
+        }
 
         //PRINT STATE RESULT TO FILE AT 25, 50, 75, 100
         if(step % 25 == 0)
@@ -170,4 +171,5 @@ int main()
     freeMem(state);
 
     printf("Time executed: %f\n", (omp_get_wtime() - begin));
+    return(EXIT_SUCCESS);
 }
