@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <omp.h>
 
-#define ARRAYSIZE 128
+#define ARRAYSIZE 512
 
 int readFile(int ***state)
 {
@@ -38,8 +38,65 @@ int readFile(int ***state)
     return (EXIT_SUCCESS);
 }
 
+//FREE ALLOCATED GAME STATE MEMORY
+void freeMem(int **state)
+{
+    for(int i = 0; i < ARRAYSIZE; i++)
+    {
+        free(state[i]);
+    }
+    free(state);
+}
+
+//GET NUMBER OF NEIGHBOURS
+int getNeighbours(int **state, int r, int c)
+{
+    int live = 0;
+    //WRAP AROUND OF CELLS
+    int north = (r-1 < 0) ? 127 : r-1;
+    int south = (r+1)%128;
+    int west = (c-1 < 0) ? 127 : c-1;
+    int east = (c+1)%128;
+
+    //CHECK NEIGHBOURS
+    live += state[north][c];
+    live += state[south][c];
+    live += state[r][west];
+    live += state[r][east];
+
+    return live;
+}
+
+//PRINT STATE TO FILE
+int printState(int **state, int step) 
+{
+    char fname[16];
+    sprintf(fname, "seq_state_%d.txt", step);
+    FILE *f = fopen(fname, "w");
+
+    if(f == NULL)
+    {
+        printf("Error creating file: %s", fname);
+        return(EXIT_FAILURE);
+    }
+
+    for(int i = 0; i < ARRAYSIZE; i++)
+    {
+        for(int j = 0; j < ARRAYSIZE; j++)
+        {
+            fprintf(f, "%d ", state[i][j]);
+        }
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
+    return(EXIT_SUCCESS);
+}
+
 int main()
 {
+    double begin = omp_get_wtime();
+
     //ALLOCATE MEMORY FOR GAME STATE
     int **state = (int **)malloc(ARRAYSIZE * sizeof(int *));
     for (int i = 0; i < ARRAYSIZE; i++)
@@ -47,38 +104,70 @@ int main()
         state[i] = (int *)malloc(ARRAYSIZE * sizeof(int));
     }
 
+    //ALLOCATE MEMORY FOR TEMP GAME STATE
+    int **tmp = (int **)malloc(ARRAYSIZE * sizeof(int *));
+    for (int i = 0; i < ARRAYSIZE; i++)
+    {
+        tmp[i] = (int *)malloc(ARRAYSIZE * sizeof(int));
+    }
+
     //READ STATIC GAME STATE FROM FILE
-    if (readFile(&state) == EXIT_FAILURE)
+    if(readFile(&state) == EXIT_FAILURE)
     {
         return (EXIT_FAILURE);
     }
 
-    //TEST INTPUT READ
-    printf("ROW 1:\n");
-    for (int i = 0; i < ARRAYSIZE; i++)
+    //GAME LOOP
+    for(int step = 1; step <= 100; step++)
     {
-        printf("%d ", state[0][i]);
-    }
-    printf("\n");
+        //GAME LOGIC
+        for(int i = 0; i < ARRAYSIZE; i++)
+        {
+            for(int j = 0; j < ARRAYSIZE; j++)
+            {
+                int curr = state[i][j];
+                int neighbours = getNeighbours(state, i, j);
 
-    printf("ROW 10:\n");
-    for (int i = 0; i < ARRAYSIZE; i++)
-    {
-        printf("%d ", state[9][i]);
-    }
-    printf("\n");
+                //IF ALIVE
+                if(curr)
+                {
+                    //WITH TOO FEW OR TOO MANY NEIGHBOURS -> DEAD
+                    if(neighbours < 2 || neighbours == 4)
+                    {
+                        tmp[i][j] = 0;
+                    }
+                    //OTHERWISE ALIVE
+                    else
+                    {
+                        tmp[i][j] = 1;
+                    }
+                }
+                //IF DEAD WITH 3 NEIGHBOURS -> ALIVE
+                else if(neighbours == 3)
+                {
+                    tmp[i][j] = 1;
+                }
+                //OTHERWISE DEAD
+                else
+                {
+                    tmp[i][j] = 0;
+                }
+            }
+        }
+        state = tmp;
 
-    printf("ROW 20:\n");
-    for (int i = 0; i < ARRAYSIZE; i++)
-    {
-        printf("%d ", state[19][i]);
+        //PRINT STATE RESULT TO FILE AT 25, 50, 75, 100
+        if(step % 25 == 0)
+        {
+            if(printState(state, step) == EXIT_FAILURE)
+            {
+                return(EXIT_FAILURE);
+            }
+        }
     }
-    printf("\n");
 
-    printf("ROW 128:\n");
-    for (int i = 0; i < ARRAYSIZE; i++)
-    {
-        printf("%d ", state[127][i]);
-    }
-    printf("\n");
+    //FREE ALLOCATED MEMORY
+    freeMem(state);
+
+    printf("Time executed: %f\n", (omp_get_wtime() - begin));
 }
