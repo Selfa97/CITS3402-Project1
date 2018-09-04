@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <omp.h>
 
-#define ARRAYSIZE 128
+#define ARRAYSIZE 2048
 
 int readFile(int ***state)
 {
@@ -70,8 +70,9 @@ int getNeighbours(int **state, int r, int c)
 //PRINT STATE TO FILE
 int printState(int **state, int step) 
 {
-    char fname[16];
-    sprintf(fname, "seq_state_%d.txt", step);
+    char *dir = "./Sequential_Figs";
+    char fname[BUFSIZ];
+    sprintf(fname, "%s/seq_state_%d.txt", dir, step);
     FILE *f = fopen(fname, "w");
 
     if(f == NULL)
@@ -157,8 +158,8 @@ int main()
             }
         }
 
-        //PRINT STATE RESULT TO FILE AT 25, 50, 75, 100
-        if(step % 25 == 0)
+        //PRINT STATE RESULT TO FILE AT 24, 25, 49, 50, 74, 75, 99, 100
+        if(step % 25 == 24 || step % 25 == 0)
         {
             if(printState(state, step) == EXIT_FAILURE)
             {

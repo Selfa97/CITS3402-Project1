@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#define ARRAYSIZE 128
+#define ARRAYSIZE 2048
 
 int main()
 {
