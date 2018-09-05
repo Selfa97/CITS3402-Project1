@@ -2,28 +2,53 @@
 #include <stdio.h>
 #include <time.h>
 
-#define ARRAYSIZE 2048
-
-int main()
+int main(int argc, char *argv[])
 {
-    FILE *f = fopen("start.txt", "w");
+    char f1name[BUFSIZ];
+    char f2name[BUFSIZ];
 
-    if(f == NULL)
-    {
-        printf("Error: File could not be opened!\n");
+    if(argc != 2) {
+        printf("Invalid number of args\n");
+        return(EXIT_FAILURE);
     }
 
-    srand((unsigned)time(NULL));
+    int const ARRAYSIZE = atoi(argv[1]);
 
-    for(int i = 0; i < ARRAYSIZE; i++)
+    if(ARRAYSIZE == 128 || ARRAYSIZE == 256 || ARRAYSIZE == 512 || ARRAYSIZE == 1024 || ARRAYSIZE == 2048)
     {
-        for(int j = 0; j < ARRAYSIZE; j++)
+        sprintf(f1name, "./Sequential_Figs/%d/seq_state_0.txt", ARRAYSIZE);
+        sprintf(f2name, "./Parallel_Figs/%d/par_state_0.txt", ARRAYSIZE);
+
+        FILE *f1 = fopen(f1name, "w");
+        FILE *f2 = fopen(f2name, "w");
+
+        if(f1 == NULL || f2 == NULL)
         {
-            fprintf(f, "%d ", rand() % 2);
+            printf("Error: File could not be opened!\n");
+            return(EXIT_FAILURE);
         }
-        fprintf(f, "\n");
-    }
-    fclose(f);
 
-    return(EXIT_SUCCESS);
+        srand((unsigned)time(NULL));
+
+        for(int i = 0; i < ARRAYSIZE; i++)
+        {
+            for(int j = 0; j < ARRAYSIZE; j++)
+            {
+                int num = rand() % 2;
+                fprintf(f1, "%d ", num);
+                fprintf(f2, "%d ", num);
+            }
+            fprintf(f1, "\n");
+            fprintf(f2, "\n");
+        }
+        fclose(f1);
+        fclose(f2);
+
+        return(EXIT_SUCCESS);
+    }
+    else
+    {
+        printf("Expected array size of: 128, 256, 512, 1024, 2048\n");
+        return(EXIT_FAILURE);
+    }
 }

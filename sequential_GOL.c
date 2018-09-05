@@ -3,11 +3,13 @@
 #include <omp.h>
 
 #define ARRAYSIZE 2048
+#define RUNS 5
 
 int readFile(int ***state)
 {
     //INIT STATIC STARTING GAME STATE FROM FILE
-    char *fname = "start.txt";
+    char fname[BUFSIZ];
+    sprintf(fname, "./Sequential_Figs/%d/seq_state_0.txt", ARRAYSIZE);
     FILE *f = fopen(fname, "r");
     int **arr = *state;
 
@@ -52,11 +54,22 @@ void freeMem(int **state)
 int getNeighbours(int **state, int r, int c)
 {
     int live = 0;
-    //WRAP AROUND OF CELLS
-    int north = (r-1 < 0) ? ARRAYSIZE-1 : r-1;
-    int south = (r+1)%ARRAYSIZE;
+    int north;
+    int south;
     int west = (c-1 < 0) ? ARRAYSIZE-1 : c-1;
     int east = (c+1)%ARRAYSIZE;
+    if(r < ARRAYSIZE)
+    {
+        //WRAP AROUND OF CELLS - FIRST ARRAY
+        north = (r-1 < 0) ? ARRAYSIZE-1 : r-1;
+        south = (r+1)%ARRAYSIZE;
+    }
+    else
+    {
+        //WRAP AROUND OF CELLS - SECOND ARRAY
+        north = (r-1 < ARRAYSIZE) ? (2 * ARRAYSIZE)-1 : r-1;
+        south = (r+1 == 2 * ARRAYSIZE) ? ARRAYSIZE : r+1;
+    }
 
     //CHECK NEIGHBOURS
     live += state[north][c];
@@ -72,7 +85,7 @@ int printState(int **state, int step)
 {
     char *dir = "./Sequential_Figs";
     char fname[BUFSIZ];
-    sprintf(fname, "%s/seq_state_%d.txt", dir, step);
+    sprintf(fname, "%s/%d/seq_state_%d.txt", dir, ARRAYSIZE, step);
     FILE *f = fopen(fname, "w");
 
     if(f == NULL)
@@ -85,7 +98,16 @@ int printState(int **state, int step)
     {
         for(int j = 0; j < ARRAYSIZE; j++)
         {
-            fprintf(f, "%d ", state[i][j]);
+            if(step % 2 == 1)
+            {
+                //PRINT FROM SECOND ARRAY
+                fprintf(f, "%d ", state[ARRAYSIZE + i][j]);
+            }
+            else
+            {
+                //PRINT FROM FIRST ARRAY
+                fprintf(f, "%d ", state[i][j]);
+            }
         }
         fprintf(f, "\n");
     }
@@ -96,81 +118,135 @@ int printState(int **state, int step)
 
 int main()
 {
-    double begin = omp_get_wtime();
+    //OPENS FILE WHERE TIMES WILL BE WRITTEN
+    char fname[BUFSIZ];
+    sprintf(fname, "./Sequential_Figs/%d/times.txt", ARRAYSIZE);
+    FILE *f = fopen(fname, "w");
 
-    //ALLOCATE MEMORY FOR GAME STATE & TEMP GAME STATE -> OFFSET INDEX
-    int **state = (int **)malloc(2 * ARRAYSIZE * sizeof(int *));
-    for (int i = 0; i < 2 * ARRAYSIZE; i++)
+    if(f == NULL)
     {
-        state[i] = (int *)malloc(ARRAYSIZE * sizeof(int));
+        printf("Error: Cannot write file %s", fname);
+        return(EXIT_FAILURE);
     }
 
-    //READ STATIC GAME STATE FROM FILE
-    if(readFile(&state) == EXIT_FAILURE)
+    //RUNS PROGRAM 5 TIMES FOR AVG RESULTS
+    for(int run = 1; run <= RUNS; run++)
     {
-        return (EXIT_FAILURE);
-    }
+        double begin = omp_get_wtime();
 
-    //GAME LOOP
-    for(int step = 1; step <= 100; step++)
-    {
-        //GAME LOGIC
-        for(int i = 0; i < ARRAYSIZE; i++)
+        //ALLOCATE MEMORY FOR GAME STATE & TEMP GAME STATE -> OFFSET INDEX
+        int **state = (int **)malloc(2 * ARRAYSIZE * sizeof(int *));
+        for (int i = 0; i < 2 * ARRAYSIZE; i++)
         {
-            for(int j = 0; j < ARRAYSIZE; j++)
-            {
-                int curr = state[i][j];
-                int neighbours = getNeighbours(state, i, j);
+            state[i] = (int *)malloc(ARRAYSIZE * sizeof(int));
+        }
 
-                //IF ALIVE
-                if(curr)
+        //READ STATIC GAME STATE FROM FILE
+        if(readFile(&state) == EXIT_FAILURE)
+        {
+            return (EXIT_FAILURE);
+        }
+
+        //GAME LOOP
+        for(int step = 1; step <= 100; step++)
+        {
+            //GAME LOGIC
+            if(step % 2 == 1)
+            {
+                //READ FROM FIRST ARRAY
+                for(int i = 0; i < ARRAYSIZE; i++)
                 {
-                    //WITH TOO FEW OR TOO MANY NEIGHBOURS -> DEAD
-                    if(neighbours < 2 || neighbours == 4)
+                    for(int j = 0; j < ARRAYSIZE; j++)
                     {
-                        state[ARRAYSIZE + i][j] = 0;
+                        int curr = state[i][j];
+                        int neighbours = getNeighbours(state, i, j);
+
+                        //IF ALIVE
+                        if(curr)
+                        {
+                            //WITH TOO FEW OR TOO MANY NEIGHBOURS -> DEAD
+                            if(neighbours < 2 || neighbours == 4)
+                            {
+                                state[ARRAYSIZE + i][j] = 0;
+                            }
+                            //OTHERWISE ALIVE
+                            else
+                            {
+                                state[ARRAYSIZE + i][j] = 1;
+                            }
+                        }
+                        //IF DEAD WITH 3 NEIGHBOURS -> ALIVE
+                        else if(neighbours == 3)
+                        {
+                            state[ARRAYSIZE + i][j] = 1;
+                        }
+                        //OTHERWISE DEAD
+                        else
+                        {
+                            state[ARRAYSIZE + i][j] = 0;
+                        }
                     }
-                    //OTHERWISE ALIVE
-                    else
-                    {
-                        state[ARRAYSIZE + i][j] = 1;
-                    }
-                }
-                //IF DEAD WITH 3 NEIGHBOURS -> ALIVE
-                else if(neighbours == 3)
-                {
-                    state[ARRAYSIZE + i][j] = 1;
-                }
-                //OTHERWISE DEAD
-                else
-                {
-                    state[ARRAYSIZE + i][j] = 0;
                 }
             }
-        }
+            else
+            {
+                //READ FROM SECOND ARRAY
+                for(int i = 0; i < ARRAYSIZE; i++)
+                {
+                    for(int j = 0; j < ARRAYSIZE; j++)
+                    {
+                        int curr = state[ARRAYSIZE + i][j];
+                        int neighbours = getNeighbours(state, ARRAYSIZE + i, j);
+
+                        //IF ALIVE
+                        if(curr)
+                        {
+                            //WITH TOO FEW OR TOO MANY NEIGHBOURS -> DEAD
+                            if(neighbours < 2 || neighbours == 4)
+                            {
+                                state[i][j] = 0;
+                            }
+                            //OTHERWISE ALIVE
+                            else
+                            {
+                                state[i][j] = 1;
+                            }
+                        }
+                        //IF DEAD WITH 3 NEIGHBOURS -> ALIVE
+                        else if(neighbours == 3)
+                        {
+                            state[i][j] = 1;
+                        }
+                        //OTHERWISE DEAD
+                        else
+                        {
+                            state[i][j] = 0;
+                        }
+                    }
+                }
+            }
         
-        //TRANSFER TEMP STATE TO CURR STATE
-        for(int i = 0; i < ARRAYSIZE; i++)
-        {
-            for(int j = 0; j < ARRAYSIZE; j++)
+            //PRINT STATE RESULT TO FILE AT 24, 25, 49, 50, 74, 75, 99, 100
+            if(step % 25 == 24 || step % 25 == 0)
             {
-                state[i][j] = state[ARRAYSIZE + i][j];
+                if(printState(state, step) == EXIT_FAILURE)
+                {
+                    return(EXIT_FAILURE);
+                }
             }
         }
 
-        //PRINT STATE RESULT TO FILE AT 24, 25, 49, 50, 74, 75, 99, 100
-        if(step % 25 == 24 || step % 25 == 0)
-        {
-            if(printState(state, step) == EXIT_FAILURE)
-            {
-                return(EXIT_FAILURE);
-            }
-        }
+        //FREE ALLOCATED MEMORY
+        freeMem(state);
+
+        //PRINTS TIME TAKEN IN TERMINAL
+        double timeTaken = omp_get_wtime() - begin;
+        printf("Time executed: %f\n", timeTaken);
+
+        //PRINTS TIME TAKEN IN FILE
+        fprintf(f, "%d. %f\n", run, timeTaken);
     }
-
-    //FREE ALLOCATED MEMORY
-    freeMem(state);
-
-    printf("Time executed: %f\n", (omp_get_wtime() - begin));
+    //CLOSES FILE
+    fclose(f);
     return(EXIT_SUCCESS);
 }
