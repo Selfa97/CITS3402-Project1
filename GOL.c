@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include <omp.h>
 
-#define ARRAYSIZE 128
+#define ARRAYSIZE 2048
 #define RUNS 5
+#define THREADS 8
 
 int readFile(int ***state)
 {
@@ -264,6 +265,9 @@ int main(int argc, char *argv[])
     }
     else
     {
+        //SET NUMBER OF THREADS
+        omp_set_num_threads(THREADS);
+
         //OPENS FILE FOR RECORDING AVG TIMES
         printf("--------PARALLEL--------\n");
         char fname[BUFSIZ];
